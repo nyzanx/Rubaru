@@ -4,6 +4,45 @@ import { useAuth } from "../App";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import QuickWorkoutModal from "../components/QuickWorkoutModal";
+import MealSwapModal from "../components/MealSwapModal";
+import IngredientScanner from "../components/IngredientScanner";
+
+const SortableDay = ({ day, isSelected, isToday, onClick }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: day.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <button
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={onClick}
+      data-testid={`day-${day.id}`}
+      className={`flex-shrink-0 w-14 py-3 rounded-2xl transition-all cursor-grab active:cursor-grabbing ${
+        isSelected
+          ? "bg-primary text-white"
+          : isToday
+          ? "bg-primary/10 text-primary border border-primary"
+          : "bg-white border border-stone-200 text-stone-700 hover:border-stone-300"
+      }`}
+    >
+      <div className="text-xs font-medium">{day.label}</div>
+      <div className="text-lg font-bold">{day.date}</div>
+    </button>
+  );
+};
 
 const WeeklyPlan = () => {
   const { api, couple } = useAuth();
@@ -12,6 +51,14 @@ const WeeklyPlan = () => {
   const [generating, setGenerating] = useState(false);
   const [selectedDay, setSelectedDay] = useState(getCurrentDay());
   const [groceryList, setGroceryList] = useState(null);
+  const [showQuickWorkout, setShowQuickWorkout] = useState(false);
+  const [showMealSwap, setShowMealSwap] = useState(null);
+  const [showIngredientScanner, setShowIngredientScanner] = useState(false);
+  const [availableIngredients, setAvailableIngredients] = useState([]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
 
   const today = new Date();
   const monday = new Date(today);
@@ -72,6 +119,7 @@ const WeeklyPlan = () => {
       const response = await api.post("/plans/generate", {
         week_start: weekStart,
         travel_mode: couple?.travel_mode || false,
+        available_ingredients: availableIngredients.length > 0 ? availableIngredients : undefined,
       });
       setPlan(response.data);
       toast.success("Weekly plan generated!");
@@ -84,6 +132,25 @@ const WeeklyPlan = () => {
     }
   };
 
+  const handleDragEnd = async (event) => {
+    const { active, over } = event;
+    
+    if (!over || active.id === over.id) return;
+
+    try {
+      await api.post("/plans/reschedule", {
+        week_start: weekStart,
+        from_day: active.id,
+        to_day: over.id,
+      });
+      
+      toast.success("Workout rescheduled!");
+      fetchPlan();
+    } catch (error) {
+      toast.error("Failed to reschedule");
+    }
+  };
+
   const getDayPlan = (dayId) => {
     if (!plan?.plan) return { workout: null, meals: null };
     return {
@@ -93,6 +160,11 @@ const WeeklyPlan = () => {
   };
 
   const isToday = (dayId) => dayId === getCurrentDay();
+
+  const handleIngredientsFound = (ingredients) => {
+    setAvailableIngredients(ingredients);
+    toast.success(`Added ${ingredients.length} ingredients!`);
+  };
 
   if (loading) {
     return (
@@ -109,7 +181,7 @@ const WeeklyPlan = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between mb-8"
+          className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
         >
           <div>
             <span className="uppercase tracking-[0.2em] text-xs font-semibold text-stone-500">
@@ -119,15 +191,60 @@ const WeeklyPlan = () => {
               Weekly Plan
             </h1>
           </div>
-          <Button
-            onClick={generatePlan}
-            disabled={generating}
-            data-testid="generate-plan-btn"
-            className="bg-primary text-white hover:bg-primary/90 rounded-full"
-          >
-            {generating ? "Generating..." : plan ? "Regenerate" : "Generate Plan"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setShowIngredientScanner(true)}
+              variant="outline"
+              data-testid="scan-ingredients-btn"
+              className="rounded-full border-stone-200"
+            >
+              📷 Scan Ingredients
+            </Button>
+            <Button
+              onClick={generatePlan}
+              disabled={generating}
+              data-testid="generate-plan-btn"
+              className="bg-primary text-white hover:bg-primary/90 rounded-full"
+            >
+              {generating ? "Generating..." : plan ? "Regenerate" : "Generate Plan"}
+            </Button>
+          </div>
         </motion.div>
+
+        {/* Available Ingredients Badge */}
+        {availableIngredients.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-success/10 rounded-2xl"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-sm font-medium text-success">Using scanned ingredients</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {availableIngredients.slice(0, 5).map((ing, i) => (
+                    <span key={i} className="px-2 py-0.5 bg-white rounded-full text-xs text-stone-600">
+                      {ing}
+                    </span>
+                  ))}
+                  {availableIngredients.length > 5 && (
+                    <span className="px-2 py-0.5 bg-white rounded-full text-xs text-stone-500">
+                      +{availableIngredients.length - 5} more
+                    </span>
+                  )}
+                </div>
+              </div>
+              <Button
+                onClick={() => setAvailableIngredients([])}
+                variant="ghost"
+                size="sm"
+                className="text-stone-500"
+              >
+                Clear
+              </Button>
+            </div>
+          </motion.div>
+        )}
 
         {!plan ? (
           <motion.div
@@ -163,26 +280,26 @@ const WeeklyPlan = () => {
             </TabsList>
 
             <TabsContent value="schedule">
-              {/* Day Selector */}
-              <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-                {weekdays.map((day) => (
-                  <button
-                    key={day.id}
-                    onClick={() => setSelectedDay(day.id)}
-                    data-testid={`day-${day.id}`}
-                    className={`flex-shrink-0 w-14 py-3 rounded-2xl transition-all ${
-                      selectedDay === day.id
-                        ? "bg-primary text-white"
-                        : isToday(day.id)
-                        ? "bg-primary/10 text-primary border border-primary"
-                        : "bg-white border border-stone-200 text-stone-700 hover:border-stone-300"
-                    }`}
-                  >
-                    <div className="text-xs font-medium">{day.label}</div>
-                    <div className="text-lg font-bold">{day.date}</div>
-                  </button>
-                ))}
-              </div>
+              {/* Day Selector with Drag & Drop */}
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={weekdays.map(d => d.id)} strategy={horizontalListSortingStrategy}>
+                  <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+                    {weekdays.map((day) => (
+                      <SortableDay
+                        key={day.id}
+                        day={day}
+                        isSelected={selectedDay === day.id}
+                        isToday={isToday(day.id)}
+                        onClick={() => setSelectedDay(day.id)}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+              
+              <p className="text-xs text-stone-400 mb-4">
+                💡 Drag days to reschedule workouts
+              </p>
 
               {/* Day Content */}
               <motion.div
@@ -197,15 +314,28 @@ const WeeklyPlan = () => {
                     <span className="uppercase tracking-[0.2em] text-xs font-semibold text-stone-500">
                       Workout
                     </span>
-                    {getDayPlan(selectedDay).workout?.type === "rest" ? (
-                      <span className="px-3 py-1 bg-stone-100 text-stone-600 rounded-full text-xs font-medium">
-                        Rest Day
-                      </span>
-                    ) : (
-                      <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium capitalize">
-                        {getDayPlan(selectedDay).workout?.type}
-                      </span>
-                    )}
+                    <div className="flex gap-2">
+                      {getDayPlan(selectedDay).workout?.type !== "rest" && (
+                        <Button
+                          onClick={() => setShowQuickWorkout(true)}
+                          variant="outline"
+                          size="sm"
+                          data-testid="quick-workout-btn"
+                          className="rounded-full text-xs"
+                        >
+                          ⚡ Quick Version
+                        </Button>
+                      )}
+                      {getDayPlan(selectedDay).workout?.type === "rest" ? (
+                        <span className="px-3 py-1 bg-stone-100 text-stone-600 rounded-full text-xs font-medium">
+                          Rest Day
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium capitalize">
+                          {getDayPlan(selectedDay).workout?.type}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {getDayPlan(selectedDay).workout && getDayPlan(selectedDay).workout.type !== "rest" ? (
@@ -260,13 +390,24 @@ const WeeklyPlan = () => {
                       return (
                         <div
                           key={mealType}
-                          className="p-4 bg-stone-50 rounded-2xl"
+                          className="p-4 bg-stone-50 rounded-2xl group"
                         >
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-medium text-stone-500 capitalize">{mealType}</span>
-                            {meal?.prep_time && (
-                              <span className="text-xs text-stone-400">{meal.prep_time} min prep</span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {meal?.prep_time && (
+                                <span className="text-xs text-stone-400">{meal.prep_time} min prep</span>
+                              )}
+                              <Button
+                                onClick={() => setShowMealSwap({ meal, mealType, date: selectedDay })}
+                                variant="ghost"
+                                size="sm"
+                                data-testid={`swap-${mealType}-btn`}
+                                className="opacity-0 group-hover:opacity-100 text-xs rounded-full"
+                              >
+                                🔄 Swap
+                              </Button>
+                            </div>
                           </div>
                           <h4 className="font-medium text-stone-900">
                             {meal?.name || "Not planned"}
@@ -337,6 +478,31 @@ const WeeklyPlan = () => {
           </Tabs>
         )}
       </div>
+
+      {/* Modals */}
+      {showQuickWorkout && (
+        <QuickWorkoutModal onClose={() => setShowQuickWorkout(false)} />
+      )}
+
+      {showMealSwap && (
+        <MealSwapModal
+          meal={showMealSwap.meal}
+          mealType={showMealSwap.mealType}
+          date={showMealSwap.date}
+          onClose={() => setShowMealSwap(null)}
+          onSwapped={(newMeal) => {
+            toast.success("Meal swapped!");
+            fetchPlan();
+          }}
+        />
+      )}
+
+      {showIngredientScanner && (
+        <IngredientScanner
+          onIngredientsFound={handleIngredientsFound}
+          onClose={() => setShowIngredientScanner(false)}
+        />
+      )}
     </div>
   );
 };

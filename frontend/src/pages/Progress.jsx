@@ -2,15 +2,18 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "../App";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
+import CycleCalendar from "../components/CycleCalendar";
 
 const Progress = () => {
   const { api, user, couple } = useAuth();
   const [stats, setStats] = useState(null);
   const [weeklyData, setWeeklyData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [onboardingData, setOnboardingData] = useState(null);
 
   useEffect(() => {
     fetchProgress();
+    fetchOnboarding();
   }, []);
 
   const fetchProgress = async () => {
@@ -25,6 +28,15 @@ const Progress = () => {
       console.error("Error fetching progress:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchOnboarding = async () => {
+    try {
+      const response = await api.get("/onboarding");
+      setOnboardingData(response.data);
+    } catch (error) {
+      console.error("Error fetching onboarding:", error);
     }
   };
 
@@ -311,6 +323,18 @@ const Progress = () => {
                 </div>
               ))}
             </div>
+          </motion.div>
+        )}
+
+        {/* Cycle Calendar */}
+        {onboardingData?.track_cycle && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.9 }}
+            className="mt-8"
+          >
+            <CycleCalendar />
           </motion.div>
         )}
       </div>

@@ -808,6 +808,361 @@ async def root():
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 
+# ==================== MENSTRUAL CYCLE ENDPOINTS ====================
+
+def calculate_cycle_phase(last_period_date: str, cycle_length: int = 28) -> dict:
+    """Calculate current menstrual cycle phase"""
+    try:
+        last_period = datetime.strptime(last_period_date, "%Y-%m-%d").date()
+        today = datetime.now(timezone.utc).date()
+        days_since_period = (today - last_period).days % cycle_length
+        
+        # Phase calculation (standard 28-day cycle adjusted)
+        if days_since_period <= 5:
+            phase = "menstrual"
+            phase_day = days_since_period + 1
+            recommendations = {
+                "workout": "Light yoga, walking, or rest. Listen to your body.",
+                "nutrition": "Iron-rich foods, anti-inflammatory meals, warm comfort foods.",
+                "intensity": "low"
+            }
+        elif days_since_period <= 13:
+            phase = "follicular"
+            phase_day = days_since_period - 5
+            recommendations = {
+                "workout": "Great time for strength training and high-intensity workouts.",
+                "nutrition": "Lean proteins, fresh vegetables, complex carbs.",
+                "intensity": "high"
+            }
+        elif days_since_period <= 16:
+            phase = "ovulatory"
+            phase_day = days_since_period - 13
+            recommendations = {
+                "workout": "Peak energy! Best time for challenging workouts and PRs.",
+                "nutrition": "Fiber-rich foods, antioxidants, lighter meals.",
+                "intensity": "high"
+            }
+        else:
+            phase = "luteal"
+            phase_day = days_since_period - 16
+            recommendations = {
+                "workout": "Moderate intensity. Yoga, pilates, steady cardio.",
+                "nutrition": "Complex carbs, magnesium-rich foods, reduce salt.",
+                "intensity": "moderate"
+            }
+        
+        # Calculate next period date
+        days_until_next = cycle_length - days_since_period
+        next_period = today + timedelta(days=days_until_next)
+        
+        return {
+            "phase": phase,
+            "phase_day": phase_day,
+            "days_since_period": days_since_period,
+            "days_until_next_period": days_until_next,
+            "next_period_date": next_period.isoformat(),
+            "cycle_length": cycle_length,
+            "recommendations": recommendations
+        }
+    except Exception as e:
+        logger.error(f"Cycle calculation error: {e}")
+        return None
+
+@api_router.get("/cycle/current")
+async def get_current_cycle(current_user: dict = Depends(get_current_user)):
+    """Get current menstrual cycle phase and recommendations"""
+    onboarding = current_user.get("onboarding_data", {})
+    
+    if not onboarding.get("track_cycle") or not onboarding.get("last_period_date"):
+        return {"tracking": False}
+    
+    cycle_info = calculate_cycle_phase(
+        onboarding["last_period_date"],
+        onboarding.get("cycle_length", 28)
+    )
+    
+    if not cycle_info:
+        return {"tracking": False, "error": "Could not calculate cycle"}
+    
+    return {"tracking": True, **cycle_info}
+
+@api_router.get("/cycle/calendar")
+async def get_cycle_calendar(current_user: dict = Depends(get_current_user)):
+    """Get cycle calendar for the next 60 days"""
+    onboarding = current_user.get("onboarding_data", {})
+    
+    if not onboarding.get("track_cycle") or not onboarding.get("last_period_date"):
+        return {"tracking": False, "days": []}
+    
+    cycle_length = onboarding.get("cycle_length", 28)
+    last_period = datetime.strptime(onboarding["last_period_date"], "%Y-%m-%d").date()
+    today = datetime.now(timezone.utc).date()
+    
+    days = []
+    for i in range(60):
+        date = today + timedelta(days=i)
+        days_since = (date - last_period).days % cycle_length
+        
+        if days_since <= 5:
+            phase = "menstrual"
+        elif days_since <= 13:
+            phase = "follicular"
+        elif days_since <= 16:
+            phase = "ovulatory"
+        else:
+            phase = "luteal"
+        
+        days.append({
+            "date": date.isoformat(),
+            "phase": phase,
+            "day_of_cycle": days_since + 1
+        })
+    
+    return {"tracking": True, "days": days, "cycle_length": cycle_length}
+
+@api_router.post("/cycle/log-period")
+async def log_period_start(current_user: dict = Depends(get_current_user)):
+    """Log that period started today"""
+    today = datetime.now(timezone.utc).date().isoformat()
+    
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"onboarding_data.last_period_date": today}}
+    )
+    
+    return {"message": "Period logged", "date": today}
+
+# ==================== WORKOUT RESCHEDULING ====================
+
+class RescheduleWorkout(BaseModel):
+    week_start: str
+    from_day: str
+    to_day: str
+
+@api_router.post("/plans/reschedule")
+async def reschedule_workout(request: RescheduleWorkout, current_user: dict = Depends(get_current_user)):
+    """Reschedule a workout from one day to another"""
+    couple_id = current_user.get("couple_id")
+    if not couple_id:
+        raise HTTPException(status_code=400, detail="Not paired")
+    
+    # Get the plan
+    plan = await db.weekly_plans.find_one(
+        {"couple_id": couple_id, "week_start": request.week_start},
+        {"_id": 0}
+    )
+    
+    if not plan or "plan" not in plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    
+    workouts = plan["plan"].get("workouts", [])
+    
+    # Find workouts for from_day and to_day
+    from_workout = next((w for w in workouts if w["day"] == request.from_day), None)
+    to_workout = next((w for w in workouts if w["day"] == request.to_day), None)
+    
+    if not from_workout or not to_workout:
+        raise HTTPException(status_code=400, detail="Invalid days")
+    
+    # Swap the workouts
+    from_workout["day"], to_workout["day"] = to_workout["day"], from_workout["day"]
+    
+    # Update in database
+    await db.weekly_plans.update_one(
+        {"couple_id": couple_id, "week_start": request.week_start},
+        {"$set": {"plan.workouts": workouts}}
+    )
+    
+    return {"message": "Workout rescheduled", "workouts": workouts}
+
+# ==================== IMAGE ANALYSIS FOR INGREDIENTS ====================
+
+class IngredientPhotoAnalysis(BaseModel):
+    image_base64: str
+
+@api_router.post("/ingredients/analyze")
+async def analyze_ingredient_photo(request: IngredientPhotoAnalysis, current_user: dict = Depends(get_current_user)):
+    """Analyze a photo of fridge/pantry to identify ingredients"""
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+        
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        if not api_key:
+            return {"ingredients": ["vegetables", "fruits", "dairy", "proteins"], "error": "AI not available"}
+        
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"ingredients_{current_user['id']}_{datetime.now().timestamp()}",
+            system_message="""You are a helpful assistant that identifies food ingredients from photos.
+List all visible food items you can identify. Return ONLY a JSON array of ingredient names, nothing else.
+Example: ["eggs", "milk", "cheese", "tomatoes", "lettuce", "chicken breast"]"""
+        )
+        chat.with_model("anthropic", "claude-sonnet-4-20250514")
+        
+        image_content = ImageContent(image_base64=request.image_base64)
+        
+        response = await chat.send_message(UserMessage(
+            text="List all the food ingredients you can see in this image. Return only a JSON array.",
+            file_contents=[image_content]
+        ))
+        
+        # Parse the response
+        import json
+        import re
+        
+        json_match = re.search(r'\[[\s\S]*?\]', response)
+        if json_match:
+            ingredients = json.loads(json_match.group())
+            return {"ingredients": ingredients}
+        
+        return {"ingredients": ["various items"], "raw_response": response}
+        
+    except Exception as e:
+        logger.error(f"Image analysis error: {e}")
+        return {"ingredients": [], "error": str(e)}
+
+# ==================== PUSH NOTIFICATIONS ====================
+
+class PushSubscription(BaseModel):
+    endpoint: str
+    keys: dict
+
+@api_router.post("/notifications/subscribe")
+async def subscribe_to_notifications(subscription: PushSubscription, current_user: dict = Depends(get_current_user)):
+    """Subscribe to push notifications"""
+    await db.push_subscriptions.update_one(
+        {"user_id": current_user["id"]},
+        {"$set": {
+            "user_id": current_user["id"],
+            "subscription": subscription.model_dump(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    return {"message": "Subscribed to notifications"}
+
+@api_router.delete("/notifications/unsubscribe")
+async def unsubscribe_from_notifications(current_user: dict = Depends(get_current_user)):
+    """Unsubscribe from push notifications"""
+    await db.push_subscriptions.delete_one({"user_id": current_user["id"]})
+    return {"message": "Unsubscribed from notifications"}
+
+@api_router.get("/notifications/status")
+async def get_notification_status(current_user: dict = Depends(get_current_user)):
+    """Check if user is subscribed to notifications"""
+    sub = await db.push_subscriptions.find_one({"user_id": current_user["id"]}, {"_id": 0})
+    return {"subscribed": sub is not None}
+
+# ==================== MILESTONES ====================
+
+@api_router.get("/milestones")
+async def get_milestones(current_user: dict = Depends(get_current_user)):
+    """Get couple's milestones with celebration status"""
+    couple_id = current_user.get("couple_id")
+    if not couple_id:
+        return {"milestones": [], "pending_celebration": None}
+    
+    couple = await db.couples.find_one({"id": couple_id}, {"_id": 0})
+    if not couple:
+        return {"milestones": [], "pending_celebration": None}
+    
+    milestones = couple.get("milestones", [])
+    
+    # Check for uncelebrated milestones
+    uncelebrated = [m for m in milestones if not m.get("celebrated")]
+    pending = uncelebrated[0] if uncelebrated else None
+    
+    return {
+        "milestones": milestones,
+        "pending_celebration": pending,
+        "streak_count": couple.get("streak_count", 0)
+    }
+
+@api_router.post("/milestones/{days}/celebrate")
+async def mark_milestone_celebrated(days: int, current_user: dict = Depends(get_current_user)):
+    """Mark a milestone as celebrated"""
+    couple_id = current_user.get("couple_id")
+    if not couple_id:
+        raise HTTPException(status_code=400, detail="Not paired")
+    
+    await db.couples.update_one(
+        {"id": couple_id, "milestones.days": days},
+        {"$set": {"milestones.$.celebrated": True}}
+    )
+    
+    return {"message": "Milestone celebrated!"}
+
+# ==================== WEEKLY INSIGHTS ====================
+
+@api_router.get("/insights/weekly")
+async def get_weekly_insights(current_user: dict = Depends(get_current_user)):
+    """Get AI-generated weekly insights based on logged data"""
+    user_id = current_user["id"]
+    
+    # Get last 7 days of logs
+    today = datetime.now(timezone.utc).date()
+    week_ago = today - timedelta(days=7)
+    
+    logs = await db.daily_logs.find({
+        "user_id": user_id,
+        "date": {"$gte": week_ago.isoformat()}
+    }, {"_id": 0}).to_list(7)
+    
+    if len(logs) < 3:
+        return {
+            "insight": "Keep logging to get personalized insights! We need at least 3 days of data.",
+            "data_points": len(logs)
+        }
+    
+    # Analyze patterns
+    energy_by_sleep = []
+    for log in logs:
+        if log.get("energy_level") and log.get("sleep_hours"):
+            energy_by_sleep.append({
+                "energy": log["energy_level"],
+                "sleep": log["sleep_hours"],
+                "date": log["date"]
+            })
+    
+    # Generate insight
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        if api_key:
+            chat = LlmChat(
+                api_key=api_key,
+                session_id=f"insight_{user_id}_{today.isoformat()}",
+                system_message="You are a supportive health coach. Generate ONE short, specific insight (2 sentences max) based on the user's weekly data. Be encouraging and actionable."
+            )
+            chat.with_model("anthropic", "claude-sonnet-4-20250514")
+            
+            logs_summary = "\n".join([
+                f"- {log['date']}: Sleep {log.get('sleep_hours', '?')}h, Energy {log.get('energy_level', '?')}/5, Workout {'✓' if log.get('workout_completed') else '✗'}"
+                for log in sorted(logs, key=lambda x: x['date'])
+            ])
+            
+            response = await chat.send_message(UserMessage(
+                text=f"Based on this week's data, give one specific insight:\n{logs_summary}"
+            ))
+            
+            return {"insight": response, "data_points": len(logs)}
+    except Exception as e:
+        logger.error(f"Insight generation error: {e}")
+    
+    # Fallback insight
+    avg_sleep = sum(log.get("sleep_hours", 0) for log in logs if log.get("sleep_hours")) / max(1, len([log for log in logs if log.get("sleep_hours")]))
+    workouts_done = sum(1 for log in logs if log.get("workout_completed"))
+    
+    if avg_sleep < 7:
+        insight = f"You averaged {avg_sleep:.1f} hours of sleep this week. Try getting to bed 30 minutes earlier - your energy levels will thank you!"
+    elif workouts_done >= 5:
+        insight = f"Amazing consistency! You completed {workouts_done} workouts this week. Keep that momentum going!"
+    else:
+        insight = "You're building great habits! Focus on consistency over intensity this week."
+    
+    return {"insight": insight, "data_points": len(logs)}
+
 # Include router
 app.include_router(api_router)
 

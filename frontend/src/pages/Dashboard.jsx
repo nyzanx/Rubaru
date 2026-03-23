@@ -5,6 +5,8 @@ import { useAuth } from "../App";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
+import MilestoneCelebration from "../components/MilestoneCelebration";
+import QuickWorkoutModal from "../components/QuickWorkoutModal";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -12,7 +14,9 @@ const Dashboard = () => {
   const [todayPlan, setTodayPlan] = useState(null);
   const [coupleLogs, setCoupleLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showCelebration, setShowCelebration] = useState(false);
+  const [pendingMilestone, setPendingMilestone] = useState(null);
+  const [showQuickWorkout, setShowQuickWorkout] = useState(false);
+  const [weeklyInsight, setWeeklyInsight] = useState(null);
 
   const today = new Date().toISOString().split("T")[0];
   const dayName = new Date().toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
@@ -27,6 +31,8 @@ const Dashboard = () => {
       return;
     }
     fetchData();
+    checkMilestones();
+    fetchInsight();
   }, [user, couple]);
 
   const fetchData = async () => {
@@ -49,6 +55,37 @@ const Dashboard = () => {
     }
   };
 
+  const checkMilestones = async () => {
+    try {
+      const response = await api.get("/milestones");
+      if (response.data.pending_celebration) {
+        setPendingMilestone(response.data.pending_celebration);
+      }
+    } catch (error) {
+      console.error("Error checking milestones:", error);
+    }
+  };
+
+  const fetchInsight = async () => {
+    try {
+      const response = await api.get("/insights/weekly");
+      setWeeklyInsight(response.data.insight);
+    } catch (error) {
+      console.error("Error fetching insight:", error);
+    }
+  };
+
+  const celebrateMilestone = async () => {
+    if (pendingMilestone) {
+      try {
+        await api.post(`/milestones/${pendingMilestone.days}/celebrate`);
+      } catch (error) {
+        console.error("Error marking milestone:", error);
+      }
+    }
+    setPendingMilestone(null);
+  };
+
   const getUserLog = (userId) => {
     return coupleLogs.find(log => log.user_id === userId) || {};
   };
@@ -69,11 +106,6 @@ const Dashboard = () => {
     return Math.min(score, 100);
   }
 
-  const triggerCelebration = () => {
-    setShowCelebration(true);
-    setTimeout(() => setShowCelebration(false), 3000);
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -84,40 +116,18 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Celebration overlay */}
-      {showCelebration && (
-        <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center">
-          <motion.div
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            className="text-6xl"
-          >
-            🎉
-          </motion.div>
-          {/* Confetti */}
-          {[...Array(20)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-3 h-3 rounded-full"
-              style={{
-                backgroundColor: ["#D96C5B", "#E9C46A", "#84A98C", "#F4A261"][i % 4],
-                left: `${Math.random() * 100}%`,
-                top: "-20px",
-              }}
-              animate={{
-                y: [0, window.innerHeight + 100],
-                rotate: [0, 720],
-                opacity: [1, 0],
-              }}
-              transition={{
-                duration: 2 + Math.random(),
-                delay: Math.random() * 0.5,
-                ease: "easeOut",
-              }}
-            />
-          ))}
-        </div>
+      {/* Milestone Celebration */}
+      {pendingMilestone && (
+        <MilestoneCelebration
+          milestone={pendingMilestone}
+          streakCount={couple?.streak_count}
+          onClose={celebrateMilestone}
+        />
+      )}
+
+      {/* Quick Workout Modal */}
+      {showQuickWorkout && (
+        <QuickWorkoutModal onClose={() => setShowQuickWorkout(false)} />
       )}
 
       <div className="container-app py-8">
@@ -228,13 +238,23 @@ const Dashboard = () => {
                 <p className="text-stone-500 text-sm mb-4">
                   {todayPlan.workout.duration_minutes} min • {todayPlan.workout.type}
                 </p>
-                <Button
-                  onClick={() => navigate("/log")}
-                  data-testid="log-workout-btn"
-                  className="w-full bg-primary text-white hover:bg-primary/90 rounded-full"
-                >
-                  {myLog.workout_completed ? "View Details" : "Log Workout"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setShowQuickWorkout(true)}
+                    variant="outline"
+                    data-testid="quick-workout-btn"
+                    className="flex-1 rounded-full border-stone-200"
+                  >
+                    ⚡ 15 min
+                  </Button>
+                  <Button
+                    onClick={() => navigate("/log")}
+                    data-testid="log-workout-btn"
+                    className="flex-1 bg-primary text-white hover:bg-primary/90 rounded-full"
+                  >
+                    {myLog.workout_completed ? "View" : "Log"}
+                  </Button>
+                </div>
               </>
             ) : (
               <div className="text-center py-4">
@@ -373,7 +393,7 @@ const Dashboard = () => {
           </motion.div>
 
           {/* Weekly Tip */}
-          {todayPlan?.tip && (
+          {(weeklyInsight || todayPlan?.tip) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -382,10 +402,10 @@ const Dashboard = () => {
               data-testid="tip-card"
             >
               <span className="uppercase tracking-[0.2em] text-xs font-semibold text-accent-foreground">
-                Weekly Insight
+                💡 Weekly Insight
               </span>
               <p className="text-stone-900 mt-2 leading-relaxed">
-                {todayPlan.tip}
+                {weeklyInsight || todayPlan.tip}
               </p>
             </motion.div>
           )}

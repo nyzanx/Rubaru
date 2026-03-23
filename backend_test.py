@@ -406,6 +406,80 @@ class DuoHealthAPITester:
             self.log_test("Get grocery list", False, error_msg)
             return False
 
+    def test_new_endpoints(self):
+        """Test new API endpoints mentioned in review"""
+        print("\n🔍 Testing New API Endpoints...")
+        
+        if not self.token:
+            self.log_test("New endpoints", False, "No token available")
+            return False
+        
+        # Test cycle endpoints
+        cycle_response = self.make_request('GET', 'cycle/current', token=self.token)
+        success = cycle_response and cycle_response.status_code == 200
+        self.log_test("Get current cycle", success, 
+                     f"Status: {cycle_response.status_code if cycle_response else 'No response'}")
+        
+        calendar_response = self.make_request('GET', 'cycle/calendar', token=self.token)
+        success = calendar_response and calendar_response.status_code == 200
+        self.log_test("Get cycle calendar", success,
+                     f"Status: {calendar_response.status_code if calendar_response else 'No response'}")
+        
+        # Test workout rescheduling
+        today = datetime.now().date()
+        monday = today - timedelta(days=today.weekday())
+        reschedule_data = {
+            "week_start": monday.strftime("%Y-%m-%d"),
+            "from_day": "monday",
+            "to_day": "tuesday"
+        }
+        reschedule_response = self.make_request('POST', 'plans/reschedule', reschedule_data, token=self.token)
+        success = reschedule_response and reschedule_response.status_code in [200, 404]  # 404 if no plan exists
+        self.log_test("Reschedule workout", success,
+                     f"Status: {reschedule_response.status_code if reschedule_response else 'No response'}")
+        
+        # Test ingredient analysis (mock data)
+        ingredient_data = {"image_base64": "fake_base64_data"}
+        ingredient_response = self.make_request('POST', 'ingredients/analyze', ingredient_data, token=self.token)
+        success = ingredient_response and ingredient_response.status_code == 200
+        self.log_test("Analyze ingredients", success,
+                     f"Status: {ingredient_response.status_code if ingredient_response else 'No response'}")
+        
+        # Test milestones
+        milestone_response = self.make_request('GET', 'milestones', token=self.token)
+        success = milestone_response and milestone_response.status_code == 200
+        self.log_test("Get milestones", success,
+                     f"Status: {milestone_response.status_code if milestone_response else 'No response'}")
+        
+        # Test weekly insights
+        insight_response = self.make_request('GET', 'insights/weekly', token=self.token)
+        success = insight_response and insight_response.status_code == 200
+        self.log_test("Get weekly insights", success,
+                     f"Status: {insight_response.status_code if insight_response else 'No response'}")
+        
+        # Test meal swap
+        meal_swap_data = {
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "meal_type": "lunch",
+            "available_ingredients": ["chicken", "rice", "vegetables"]
+        }
+        swap_response = self.make_request('POST', 'plans/swap-meal', meal_swap_data, token=self.token)
+        success = swap_response and swap_response.status_code == 200
+        self.log_test("Swap meal", success,
+                     f"Status: {swap_response.status_code if swap_response else 'No response'}")
+        
+        # Test quick workout
+        quick_workout_data = {
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "available_minutes": 15
+        }
+        quick_response = self.make_request('POST', 'plans/quick-workout', quick_workout_data, token=self.token)
+        success = quick_response and quick_response.status_code == 200
+        self.log_test("Get quick workout", success,
+                     f"Status: {quick_response.status_code if quick_response else 'No response'}")
+        
+        return True
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting DuoHealth API Tests...")
@@ -429,6 +503,7 @@ class DuoHealthAPITester:
                 self.test_weekly_plans()
                 self.test_progress_endpoints()
                 self.test_grocery_list()
+                self.test_new_endpoints()
         
         # Test login separately
         self.test_user_login()
