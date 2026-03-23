@@ -187,11 +187,11 @@ const AppLayout = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-0">
+    <div className="min-h-screen bg-background pb-28 md:pb-0 md:pl-20">
       {children}
       
       {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-6 left-6 right-6 bg-stone-900/95 backdrop-blur-lg text-white rounded-full p-2 flex justify-around items-center shadow-2xl z-50 md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 bg-stone-900/95 backdrop-blur-lg text-white p-4 pb-6 flex justify-around items-center shadow-2xl z-50 md:hidden mobile-nav-safe">
         {navItems.map((item) => (
           <button
             key={item.path}

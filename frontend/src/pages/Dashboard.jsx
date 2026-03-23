@@ -22,16 +22,20 @@ const Dashboard = () => {
   const dayName = new Date().toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
 
   useEffect(() => {
-    if (!user?.onboarding_complete) {
+    // Don't redirect during initial load
+    if (!user) return;
+    
+    if (!user.onboarding_complete) {
       navigate("/onboarding");
       return;
     }
-    if (!couple?.paired) {
-      navigate("/invite");
-      return;
-    }
+    
+    // Allow access to dashboard even without pairing
+    // Just show limited functionality
     fetchData();
-    checkMilestones();
+    if (couple?.paired) {
+      checkMilestones();
+    }
     fetchInsight();
   }, [user, couple]);
 
