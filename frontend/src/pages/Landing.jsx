@@ -72,7 +72,7 @@ const Landing = () => {
             animate={{ opacity: 1, x: 0 }}
             className="font-heading text-2xl font-bold text-stone-900"
           >
-            DuoHealth
+            Rubaru
           </motion.div>
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -114,7 +114,7 @@ const Landing = () => {
               </h1>
               <p className="text-lg text-stone-600 leading-relaxed mb-8 max-w-lg">
                 People stay consistent when they have a partner doing it with them. 
-                DuoHealth creates shared plans, tracks your shared streak, and celebrates 
+                Rubaru creates shared plans, tracks your shared streak, and celebrates 
                 your wins as a couple.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
@@ -238,8 +238,8 @@ const Landing = () => {
       {/* Footer */}
       <footer className="px-6 md:px-12 lg:px-24 py-8 border-t border-stone-100">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="font-heading text-xl font-bold text-stone-900">DuoHealth</div>
-          <p className="text-stone-500 text-sm">© 2024 DuoHealth. Built with love for couples.</p>
+          <div className="font-heading text-xl font-bold text-stone-900">Rubaru</div>
+          <p className="text-stone-500 text-sm">© 2024 Rubaru. Built with love for couples.</p>
         </div>
       </footer>
     </div>

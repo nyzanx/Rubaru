@@ -28,7 +28,7 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 72
 
 # Create the main app
-app = FastAPI(title="DuoHealth API")
+app = FastAPI(title="Rubaru API")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -802,7 +802,7 @@ async def get_grocery_list(current_user: dict = Depends(get_current_user)):
 
 @api_router.get("/")
 async def root():
-    return {"message": "DuoHealth API", "version": "1.0.0"}
+    return {"message": "Rubaru API", "version": "1.0.0"}
 
 @api_router.get("/health")
 async def health_check():

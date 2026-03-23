@@ -210,7 +210,7 @@ const AppLayout = ({ children }) => {
 
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex fixed left-0 top-0 h-full w-20 bg-white border-r border-stone-100 flex-col items-center py-8 z-40">
-        <div className="text-2xl font-heading font-bold text-primary mb-12">D</div>
+        <div className="text-2xl font-heading font-bold text-primary mb-12">R</div>
         {navItems.map((item) => (
           <button
             key={item.path}

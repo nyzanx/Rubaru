@@ -71,7 +71,7 @@ const Register = () => {
           className="w-full max-w-md"
         >
           <Link to="/" className="font-heading text-2xl font-bold text-stone-900 mb-8 block">
-            DuoHealth
+            Rubaru
           </Link>
           
           <h1 className="font-heading text-3xl font-bold text-stone-900 tracking-tight mb-2">
