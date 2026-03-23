@@ -1,0 +1,181 @@
+{
+  "brand_identity": {
+    "name": "DuoHealth",
+    "emotional_archetype": "Organic & Earthy (Trust, Growth, Calm)",
+    "core_concept": "Two as One: Consistency through Partnership",
+    "tone": "Supportive, Warm, Non-judgmental, Intimate",
+    "visual_mood": "Pottery, Clay, Sunrise, Soft Utility"
+  },
+  "typography": {
+    "heading_font": {
+      "name": "Manrope",
+      "weights": ["400", "600", "800"],
+      "usage": "Headings, Hero Titles, Big Stats",
+      "cdn_url": "https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap"
+    },
+    "body_font": {
+      "name": "Figtree",
+      "weights": ["400", "500", "700"],
+      "usage": "Body text, UI elements, Labels",
+      "cdn_url": "https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;700&display=swap"
+    },
+    "rules": {
+      "headings": "tracking-tight leading-none font-bold text-stone-900",
+      "overline": "uppercase tracking-[0.2em] text-xs font-semibold text-stone-500",
+      "body": "leading-relaxed text-stone-700",
+      "numbers": "tabular-nums tracking-tight font-heading"
+    }
+  },
+  "colors": {
+    "palette": {
+      "primary": {
+        "DEFAULT": "#D96C5B",
+        "foreground": "#FFFFFF",
+        "hover": "#C05645"
+      },
+      "secondary": {
+        "DEFAULT": "#E7E5E4",
+        "foreground": "#292524"
+      },
+      "background": "#FAFAF9",
+      "foreground": "#292524",
+      "muted": {
+        "DEFAULT": "#F5F5F4",
+        "foreground": "#78716C"
+      },
+      "accent": {
+        "DEFAULT": "#FFEDD5",
+        "foreground": "#9A3412"
+      },
+      "card": {
+        "DEFAULT": "#FFFFFF",
+        "foreground": "#292524"
+      },
+      "border": "#E7E5E4",
+      "success": "#84A98C",
+      "warning": "#E9C46A"
+    },
+    "gradients": {
+      "hero_glow": "bg-gradient-to-tr from-[#D96C5B]/20 via-[#F4A261]/10 to-transparent",
+      "glass": "bg-white/70 backdrop-blur-xl border border-white/40"
+    }
+  },
+  "layout_system": {
+    "spacing_scale": "Generous (2x standard). Base unit p-6 or p-8 for containers.",
+    "container_padding": "px-6 md:px-12 lg:px-24",
+    "grids": {
+      "marketing": "Grid-cols-12. Gap-8. Asymmetric 'Tetris' layout.",
+      "dashboard": "Grid-cols-4. Gap-6. Dense 'Bento' layout.",
+      "mobile": "Single column. Vertical stacking. 80vh max image height."
+    },
+    "radius": {
+      "default": "rounded-2xl",
+      "button": "rounded-full",
+      "card": "rounded-2xl"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-8 py-6 text-lg font-semibold transition-transform hover:scale-105 active:scale-95 shadow-lg shadow-primary/20",
+      "secondary": "bg-white text-stone-900 border border-stone-200 hover:bg-stone-50 rounded-full px-6 py-4 font-medium transition-colors"
+    },
+    "cards": {
+      "dashboard": "bg-white rounded-3xl p-6 border border-stone-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-lg transition-all duration-300",
+      "feature": "bg-stone-50 rounded-3xl p-8 border-none"
+    },
+    "inputs": {
+      "default": "bg-white border-stone-200 rounded-xl h-12 px-4 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+    },
+    "navigation": {
+      "mobile_nav": "fixed bottom-6 left-6 right-6 bg-stone-900/90 backdrop-blur-lg text-white rounded-full p-2 flex justify-between items-center shadow-2xl z-50",
+      "desktop_nav": "fixed top-0 w-full bg-white/80 backdrop-blur-md border-b border-stone-100 z-50 h-20"
+    },
+    "badges": {
+      "streak": "bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1"
+    }
+  },
+  "visual_enhancers": {
+    "textures": {
+      "grain": "url('data:image/svg+xml,...') opacity-50 overlay",
+      "noise": "fixed inset-0 opacity-[0.03] pointer-events-none z-50 mix-blend-overlay bg-noise-pattern"
+    },
+    "shadows": {
+      "soft": "shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)]",
+      "float": "shadow-[0_20px_40px_-4px_rgba(0,0,0,0.08)]"
+    },
+    "icons": {
+      "library": "lucide-react",
+      "style": "Stroke width 1.5px or 2px. Rounded caps.",
+      "color": "text-stone-700"
+    }
+  },
+  "motion": {
+    "library": "framer-motion",
+    "transitions": {
+      "page_load": {
+        "initial": { "opacity": 0, "y": 20 },
+        "animate": { "opacity": 1, "y": 0 },
+        "transition": { "duration": 0.5, "ease": "easeOut" }
+      },
+      "stagger": {
+        "container": { "staggerChildren": 0.1 },
+        "item": { "initial": { "opacity": 0, "y": 10 }, "animate": { "opacity": 1, "y": 0 } }
+      },
+      "hover_lift": {
+        "whileHover": { "y": -4 },
+        "transition": { "type": "spring", "stiffness": 300 }
+      }
+    }
+  },
+  "accessibility": {
+    "contrast": "Ensure text-stone-500+ is used on light backgrounds.",
+    "focus_states": "ring-2 ring-primary ring-offset-2",
+    "reduced_motion": "Respect user preference. Use opacity fades instead of transforms.",
+    "testing": "All interactive elements must have data-testid='kebab-case-name'"
+  },
+  "assets": {
+    "images": [
+      {
+        "category": "hero_couple",
+        "url": "https://images.unsplash.com/photo-1720804274286-eb479df0388a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAxODF8MHwxfHNlYXJjaHw0fHxjb3VwbGUlMjB3b3Jrb3V0JTIwdG9nZXRoZXJ8ZW58MHx8fHwxNzc0Mjk1MTc1fDA&ixlib=rb-4.1.0&q=85",
+        "alt": "Couple running together in morning light",
+        "description": "Use for Landing Page Hero or 'Get Active' section"
+      },
+      {
+        "category": "yoga_couple",
+        "url": "https://images.unsplash.com/photo-1758599880453-ba4b22553606?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAxODF8MHwxfHNlYXJjaHwxfHxjb3VwbGUlMjB3b3Jrb3V0JTIwdG9nZXRoZXJ8ZW58MHx8fHwxNzc0Mjk1MTc1fDA&ixlib=rb-4.1.0&q=85",
+        "alt": "Couple doing yoga",
+        "description": "Use for 'Mindfulness' or Feature section"
+      },
+      {
+        "category": "healthy_food",
+        "url": "https://images.pexels.com/photos/1120575/pexels-photo-1120575.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "alt": "Healthy breakfast bowl",
+        "description": "Use for Meal Planning section"
+      },
+      {
+        "category": "gym_couple",
+        "url": "https://images.unsplash.com/photo-1738523686534-7055df5858d6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAxODF8MHwxfHNlYXJjaHwyfHxjb3VwbGUlMjB3b3Jrb3V0JTIwdG9nZXRoZXJ8ZW58MHx8fHwxNzc0Mjk1MTc1fDA&ixlib=rb-4.1.0&q=85",
+        "alt": "Couple at gym",
+        "description": "Use for Workout Log feature"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Install 'framer-motion' and 'lucide-react' immediately.",
+    "Update tailwind.config.js to include the specific colors defined in this JSON.",
+    "Add the font Google links to index.html or import in CSS.",
+    "Use the 'Bento' grid layout for the dashboard: Large main widget (Completed today), medium widget (Partner's status), small widgets (Water/Mood).",
+    "Implement the 'Shared Streak' prominently with a celebratory animation when both partners complete.",
+    "Use 'Warm Sand' (#FAFAF9) as the global background color, NOT white.",
+    "Ensure all buttons are 'pill' shaped (rounded-full).",
+    "NEVER use gradients for text. Keep text solid high-contrast."
+  ],
+  "universal_guidelines": [
+    "Avoid 'AI Slop': No generic centered layouts, no 'Inter' for headings.",
+    "Spacing: Use p-8 where you would usually use p-4.",
+    "Micro-interactions: Buttons should scale slightly on hover.",
+    "Glassmorphism: Use for sticky headers and overlays, but keep it subtle (white/80).",
+    "Data-Test-IDs: Mandatory for all interactive elements."
+  ]
+}
