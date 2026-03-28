@@ -235,11 +235,36 @@ const Settings = () => {
             </motion.div>
           )}
 
-          {/* Danger Zone */}
+          {/* Help & Support */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
+            className="bg-white rounded-3xl p-6 border border-stone-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
+          >
+            <h2 className="font-heading text-lg font-semibold text-stone-900 mb-4">Help</h2>
+            <Button
+              onClick={() => {
+                localStorage.removeItem(`tutorial_seen_${user?.id}`);
+                navigate("/dashboard");
+                toast.success("Tutorial will replay on dashboard!");
+              }}
+              variant="outline"
+              data-testid="replay-tutorial-btn"
+              className="w-full rounded-full border-stone-200 mb-3"
+            >
+              📖 Replay Tutorial
+            </Button>
+            <p className="text-xs text-stone-500 text-center">
+              Take the guided tour again to learn about all features.
+            </p>
+          </motion.div>
+
+          {/* Danger Zone */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
             className="bg-stone-50 rounded-3xl p-6"
           >
             <h2 className="font-heading text-lg font-semibold text-stone-900 mb-4">Account</h2>

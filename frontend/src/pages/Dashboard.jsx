@@ -7,6 +7,7 @@ import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
 import MilestoneCelebration from "../components/MilestoneCelebration";
 import QuickWorkoutModal from "../components/QuickWorkoutModal";
+import Tutorial from "../components/Tutorial";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ const Dashboard = () => {
   const [pendingMilestone, setPendingMilestone] = useState(null);
   const [showQuickWorkout, setShowQuickWorkout] = useState(false);
   const [weeklyInsight, setWeeklyInsight] = useState(null);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const today = new Date().toISOString().split("T")[0];
   const dayName = new Date().toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
@@ -28,6 +30,13 @@ const Dashboard = () => {
     if (!user.onboarding_complete) {
       navigate("/onboarding");
       return;
+    }
+    
+    // Check if first time on dashboard
+    const tutorialSeen = localStorage.getItem(`tutorial_seen_${user.id}`);
+    if (!tutorialSeen) {
+      // Small delay to let dashboard render first
+      setTimeout(() => setShowTutorial(true), 500);
     }
     
     // Allow access to dashboard even without pairing
@@ -110,6 +119,17 @@ const Dashboard = () => {
     return Math.min(score, 100);
   }
 
+  const completeTutorial = () => {
+    localStorage.setItem(`tutorial_seen_${user.id}`, "true");
+    setShowTutorial(false);
+    toast.success("You're ready to go! Start by generating your first plan.");
+  };
+
+  const skipTutorial = () => {
+    localStorage.setItem(`tutorial_seen_${user.id}`, "true");
+    setShowTutorial(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -120,6 +140,11 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Tutorial */}
+      {showTutorial && (
+        <Tutorial onComplete={completeTutorial} onSkip={skipTutorial} />
+      )}
+
       {/* Milestone Celebration */}
       {pendingMilestone && (
         <MilestoneCelebration
