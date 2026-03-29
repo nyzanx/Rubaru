@@ -485,17 +485,16 @@ async def generate_weekly_plan(request: WeeklyPlanRequest, current_user: dict = 
 async def generate_ai_plan(partner1: dict, partner2: dict, request: WeeklyPlanRequest, travel_mode: bool) -> dict:
     """Generate weekly plan using Claude AI"""
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        import anthropic
+
+        api_key = os.environ.get('ANTHROPIC_API_KEY')
         if not api_key:
-            logger.warning("No EMERGENT_LLM_KEY, using mock plan")
+            logger.warning("No ANTHROPIC_API_KEY, using mock plan")
             return generate_mock_plan(partner1, partner2, request, travel_mode)
-        
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"plan_{partner1['id']}_{request.week_start}",
-            system_message="""You are a fitness and nutrition expert creating personalized weekly plans for couples.
+
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+
+        system_message = """You are a fitness and nutrition expert creating personalized weekly plans for couples.
 Create plans that are:
 - Practical and achievable for busy professionals
 - Respectful of dietary restrictions and preferences
@@ -526,9 +525,6 @@ Return a JSON object with this structure:
   "water_targets": {"partner1": 8, "partner2": 6},
   "weekly_tip": "A motivational or practical tip"
 }"""
-        )
-        
-        chat.with_model("anthropic", "claude-sonnet-4-20250514")
         
         p1_data = partner1.get("onboarding_data", {})
         p2_data = partner2.get("onboarding_data", {})
@@ -558,7 +554,13 @@ Busy days: {', '.join(request.busy_days or [])}
 
 Generate a complete 7-day plan with 5 workout days and 2 rest days. Return only valid JSON."""
         
-        response = await chat.send_message(UserMessage(text=prompt))
+        msg = await client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=4096,
+            system=system_message,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        response = msg.content[0].text
         
         # Parse JSON from response
         import json
@@ -630,25 +632,25 @@ def generate_mock_plan(partner1: dict, partner2: dict, request: WeeklyPlanReques
 async def swap_meal(request: MealSwapRequest, current_user: dict = Depends(get_current_user)):
     """Swap a meal based on available ingredients"""
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        import anthropic
         import json
         import re
-        
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+
+        api_key = os.environ.get('ANTHROPIC_API_KEY')
         if not api_key:
             return {"swapped_meal": {"name": "Quick Veggie Stir-fry", "prep_time": 15, "ingredients": request.available_ingredients[:5]}}
-        
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"swap_{current_user['id']}_{request.date}",
-            system_message="You are a nutrition expert. Suggest a healthy meal alternative based on available ingredients. Return only JSON."
-        )
-        chat.with_model("anthropic", "claude-sonnet-4-20250514")
-        
+
+        client = anthropic.AsyncAnthropic(api_key=api_key)
         prompt = f"""Suggest a healthy {request.meal_type} using these ingredients: {', '.join(request.available_ingredients)}
 Return JSON: {{"name": "...", "prep_time": minutes, "ingredients": [...], "instructions": "brief instructions"}}"""
         
-        response = await chat.send_message(UserMessage(text=prompt))
+        msg = await client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=512,
+            system="You are a nutrition expert. Suggest a healthy meal alternative based on available ingredients. Return only JSON.",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        response = msg.content[0].text
         json_match = re.search(r'\{[\s\S]*?\}', response)
         if json_match:
             return {"swapped_meal": json.loads(json_match.group())}
@@ -984,27 +986,46 @@ class IngredientPhotoAnalysis(BaseModel):
 async def analyze_ingredient_photo(request: IngredientPhotoAnalysis, current_user: dict = Depends(get_current_user)):
     """Analyze a photo of fridge/pantry to identify ingredients"""
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
-        
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        import anthropic
+        import json
+        import re
+
+        api_key = os.environ.get('ANTHROPIC_API_KEY')
         if not api_key:
             return {"ingredients": ["vegetables", "fruits", "dairy", "proteins"], "error": "AI not available"}
-        
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"ingredients_{current_user['id']}_{datetime.now().timestamp()}",
-            system_message="""You are a helpful assistant that identifies food ingredients from photos.
+
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+
+        # Strip data URL prefix if present (e.g. "data:image/jpeg;base64,...") 
+        image_data = request.image_base64
+        if "," in image_data:
+            image_data = image_data.split(",", 1)[1]
+
+        msg = await client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=512,
+            system="""You are a helpful assistant that identifies food ingredients from photos.
 List all visible food items you can identify. Return ONLY a JSON array of ingredient names, nothing else.
-Example: ["eggs", "milk", "cheese", "tomatoes", "lettuce", "chicken breast"]"""
+Example: ["eggs", "milk", "cheese", "tomatoes", "lettuce", "chicken breast"]""",
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/jpeg",
+                            "data": image_data
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": "List all the food ingredients you can see in this image. Return only a JSON array."
+                    }
+                ]
+            }]
         )
-        chat.with_model("anthropic", "claude-sonnet-4-20250514")
-        
-        image_content = ImageContent(image_base64=request.image_base64)
-        
-        response = await chat.send_message(UserMessage(
-            text="List all the food ingredients you can see in this image. Return only a JSON array.",
-            file_contents=[image_content]
-        ))
+        response = msg.content[0].text
         
         # Parse the response
         import json
@@ -1126,16 +1147,15 @@ async def get_weekly_insights(current_user: dict = Depends(get_current_user)):
     
     # Generate insight
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
-        if api_key:
-            chat = LlmChat(
-                api_key=api_key,
-                session_id=f"insight_{user_id}_{today.isoformat()}",
-                system_message="You are a supportive health coach. Generate ONE short, specific insight (2 sentences max) based on the user's weekly data. Be encouraging and actionable."
-            )
-            chat.with_model("anthropic", "claude-sonnet-4-20250514")
+        import anthropic
+        import json
+        import re
+
+        api_key = os.environ.get('ANTHROPIC_API_KEY')
+        if not api_key:
+            return {"swapped_meal": {"name": "Quick Veggie Stir-fry", "prep_time": 15, "ingredients": request.available_ingredients[:5]}}
+
+        client = anthropic.AsyncAnthropic(api_key=api_key)
             
             logs_summary = "\n".join([
                 f"- {log['date']}: Sleep {log.get('sleep_hours', '?')}h, Energy {log.get('energy_level', '?')}/5, Workout {'✓' if log.get('workout_completed') else '✗'}"
@@ -1177,3 +1197,29 @@ app.add_middleware(
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+        msg = await client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=512,
+            system="You are a nutrition expert. Suggest a healthy meal alternative based on available ingredients. Return only JSON.",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        import anthropic
+
+        api_key = os.environ.get('ANTHROPIC_API_KEY')
+        if api_key:
+            client = anthropic.AsyncAnthropic(api_key=api_key)
+
+            logs_summary = "\n".join([
+                f"- {log['date']}: Sleep {log.get('sleep_hours', '?')}h, Energy {log.get('energy_level', '?')}/5, Workout {'✓' if log.get('workout_completed') else '✗'}"
+                for log in sorted(logs, key=lambda x: x['date'])
+            ])
+
+            msg = await client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=150,
+                system="You are a supportive health coach. Generate ONE short, specific insight (2 sentences max) based on the user's weekly data. Be encouraging and actionable.",
+                messages=[{"role": "user", "content": f"Based on this week's data, give one specific insight:\n{logs_summary}"}]
+            )
+            response = msg.content[0].text
+
+            return {"insight": response, "data_points": len(logs)}
